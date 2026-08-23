@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DCO allocation check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EEF1F4;--card:#FFF;--ink:#141C24;--mid:#54637A;--soft:#8593A6;
+  --rule:#DCE2EA;--line:#E7ECF1;
+  --swap:#B23A2E;--swap-bg:#FBEDEB;--grab:#0E6E63;--grab-bg:#E7F4F1;
+  --ok:#4B8A5A;--gen:#8A5A00;--gen-bg:#FBF2E2;--gen-line:#EBD9AE;--accent:#2D4A8A;
+  --disp:'Space Grotesk',system-ui,sans-serif;--body:'Inter',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);font-family:var(--body);color:var(--ink);font-size:14px;
+  line-height:1.5;-webkit-font-smoothing:antialiased;padding-bottom:64px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1000px;margin:0 auto;padding:0 20px}
+[hidden]{display:none!important}
+
+.top{background:var(--ink);color:#fff;padding:24px 0 20px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#7D90AC}
+h1{font-family:var(--disp);font-size:26px;font-weight:700;letter-spacing:-.02em;margin-top:6px}
+h1 small{font-weight:500;color:#7D90AC;font-size:16px}
+.hmeta{font-family:var(--mono);font-size:10.5px;color:#7D90AC;letter-spacing:.05em;margin-top:8px}
+
+/* upload */
+#upload{padding-top:44px}
+.drop{background:var(--card);border:2px dashed var(--rule);border-radius:14px;padding:46px 26px;
+  text-align:center;transition:border-color .15s,background .15s}
+.drop.over{border-color:var(--accent);background:#F4F7FD}
+.drop h2{font-family:var(--disp);font-size:21px;margin-bottom:8px}
+.drop p{color:var(--mid);max-width:460px;margin:0 auto 18px}
+.btn{display:inline-block;background:var(--ink);color:#fff;border:none;border-radius:8px;
+  padding:11px 22px;font-family:var(--body);font-size:14px;font-weight:500;cursor:pointer}
+.btn:hover{background:#26333F}
+#upstatus{margin-top:16px;font-family:var(--mono);font-size:12px;color:var(--mid)}
+.bad{color:var(--swap)}
+.note{margin-top:22px;font-size:12.5px;color:var(--soft);text-align:center}
+
+/* controls */
+.bar{background:var(--card);border-bottom:1px solid var(--rule);padding:14px 0;position:sticky;top:0;z-index:20}
+.ctl{display:grid;grid-template-columns:1.25fr .85fr .8fr .8fr auto auto;gap:10px;align-items:end}
+.fl label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--soft);margin-bottom:5px}
+.fl input,.fl select{width:100%;border:1px solid var(--rule);border-radius:7px;padding:9px 11px;
+  font-family:var(--body);font-size:13.5px;background:#fff;color:var(--ink)}
+.go{border:none;border-radius:7px;background:var(--ink);color:#fff;padding:10px 20px;
+  font-family:var(--mono);font-size:12px;cursor:pointer;white-space:nowrap}
+.go:hover{background:#26333F}.go:disabled{opacity:.45;cursor:default}
+.ghost{background:none;border:1px solid var(--rule);color:var(--mid);border-radius:7px;
+  padding:10px 14px;font-family:var(--mono);font-size:11px;cursor:pointer;white-space:nowrap}
+.ghost:hover{border-color:var(--mid);color:var(--ink)}
+details.src{margin-top:10px}
+details.src summary{font-family:var(--mono);font-size:10.5px;color:var(--soft);cursor:pointer;
+  letter-spacing:.06em;text-transform:uppercase}
+details.src input,details.src textarea{width:100%;border:1px solid var(--rule);border-radius:7px;
+  padding:8px 10px;font-family:var(--mono);font-size:11.5px;margin-top:8px}
+details.src textarea{min-height:88px;resize:vertical}
+#plannote{font-family:var(--mono);font-size:10.5px;color:var(--soft);margin-top:8px}
+
+main{padding-top:24px}
+.msg{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:36px 24px;
+  text-align:center;color:var(--mid)}
+.msg h2{font-family:var(--disp);font-size:19px;color:var(--ink);margin-bottom:6px}
+.msg.err{background:var(--swap-bg);border-color:#EFCBC5;color:#7C241B}
+
+.combo{font-family:var(--mono);font-size:13px;color:var(--mid);display:flex;
+  align-items:baseline;gap:6px;flex-wrap:wrap}
+.combo b{color:var(--ink);font-weight:600}
+.tripcount{margin-left:auto;color:var(--soft);font-size:11.5px}
+.score{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--rule);
+  border:1px solid var(--rule);border-radius:12px;overflow:hidden;margin-top:14px}
+.sc{background:var(--card);padding:15px 16px}
+.sc .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--soft)}
+.sc .v{font-family:var(--disp);font-size:30px;font-weight:700;margin-top:3px;letter-spacing:-.02em}
+.sc.act .v{color:var(--swap)}.sc.gen .v{color:var(--gen)}.sc.dco .v{color:var(--ok)}
+
+section{margin-top:30px}
+.sec-h{display:flex;align-items:baseline;gap:12px;margin-bottom:12px}
+.sn{font-family:var(--mono);font-size:12px;font-weight:700;color:#fff;background:var(--ink);
+  width:24px;height:24px;border-radius:6px;display:inline-flex;align-items:center;
+  justify-content:center;flex:0 0 auto}
+.sec-h h2{font-family:var(--disp);font-size:19px;font-weight:600;letter-spacing:-.01em}
+.cnt{font-family:var(--mono);font-size:13px;color:var(--soft);font-weight:400;margin-left:6px}
+.sec-h .hint{font-size:12.5px;color:var(--mid);margin-left:auto;text-align:right;max-width:330px}
+
+.panel{background:var(--card);border:1px solid var(--rule);border-radius:12px;overflow:hidden}
+table{width:100%;border-collapse:collapse}
+th{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--soft);text-align:left;padding:11px 16px;border-bottom:1px solid var(--line);font-weight:500}
+th.num,td.num{text-align:right;font-variant-numeric:tabular-nums}
+td{padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+.loc{font-weight:500}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);
+  margin-right:9px;vertical-align:middle}
+.r-part .dot{background:#D6A32E}.r-empty .dot{background:var(--swap)}.dot.warn{background:var(--gen)}
+.mt{font-family:var(--mono);font-size:10px;color:var(--soft);margin-left:8px;
+  border:1px solid var(--rule);border-radius:4px;padding:1px 5px}
+.mt.hard{color:var(--ink);border-color:var(--ink)}
+td.num{font-family:var(--mono);font-size:14px}
+td.num.strong{color:var(--ok);font-weight:700}
+td.num.gap{color:var(--swap);font-weight:700}
+td.num.zero{color:var(--soft)}
+.cabs{font-family:var(--mono);font-size:10.5px;color:var(--soft);line-height:1.7}
+.barcell{width:110px}
+.bar{display:block;height:7px;background:var(--line);border-radius:4px;overflow:hidden}
+.fill{display:block;height:100%;background:var(--ok);border-radius:4px}
+
+.cards{display:flex;flex-direction:column;gap:12px}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:16px 18px}
+.card-h{display:flex;align-items:center;gap:12px}
+.card-title{font-family:var(--disp);font-size:16px;font-weight:600}
+.card-sub{font-family:var(--mono);font-size:11.5px;color:var(--mid);margin-top:4px}
+.card-h .copy{margin-left:auto}
+.trips{list-style:none;margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.trips li{display:flex;align-items:center;gap:10px;padding:7px 10px;background:var(--paper);border-radius:7px}
+.trips code{font-family:var(--mono);font-size:13px;font-weight:600}
+.vend{font-size:12.5px;color:var(--mid)}
+.dist{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--soft)}
+.pill{font-family:var(--mono);font-size:10.5px;padding:2px 8px;border-radius:20px;font-weight:500}
+.pill.swap{background:var(--swap-bg);color:var(--swap)}
+.pill.grab{background:var(--grab-bg);color:var(--grab)}
+.copy{font-family:var(--mono);font-size:11.5px;background:var(--ink);color:#fff;border:none;
+  border-radius:7px;padding:8px 13px;cursor:pointer;white-space:nowrap}
+.copy:hover{background:#26333F}.copy.done{background:var(--ok)}
+.panel.gen{border-color:var(--gen-line);background:var(--gen-bg)}
+.panel.gen th{border-color:var(--gen-line);color:#9A7016}
+.panel.gen td{border-color:var(--gen-line)}
+.empty-msg{padding:20px 16px;text-align:center;color:var(--soft);font-size:13px}
+.planning-note{font-size:12.5px;color:var(--mid);margin-top:10px;font-style:italic}
+@media(max-width:820px){.ctl{grid-template-columns:1fr 1fr}.go,.ghost{grid-column:span 1}
+  .score{grid-template-columns:repeat(2,1fr)}.sec-h .hint{display:none}.barcell,.cabs{display:none}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head><body>
+
+<header class="top"><div class="wrap">
+  <div class="eyebrow">DCO allocation check &middot; night-before</div>
+  <h1>Give the plan its routes <small id="hcity"></small></h1>
+  <div class="hmeta" id="hmeta">Upload a supply plan to begin</div>
+</div></header>
+
+<!-- upload -->
+<div class="wrap" id="upload">
+  <div class="drop" id="drop">
+    <h2>Upload the supply plan</h2>
+    <p>Drop the plan JSON here, or choose the file. It is read in your browser and never uploaded anywhere.</p>
+    <label class="btn">Choose plan JSON<input type="file" id="file" accept=".json,application/json" hidden></label>
+    <div id="upstatus"></div>
+  </div>
+  <p class="note">The plan is remembered on this device, so you only upload again when the plan changes.</p>
+</div>
+
+<!-- app -->
+<div id="app" hidden>
+  <div class="bar"><div class="wrap">
+    <div class="ctl">
+      <div class="fl"><label for="bu">Business unit</label>
+        <input id="bu" list="bulist" placeholder="cibc-chyd" autocomplete="off"><datalist id="bulist"></datalist></div>
+      <div class="fl"><label for="date">Date</label><input id="date" type="date"></div>
+      <div class="fl"><label for="dir">Direction</label>
+        <select id="dir"><option value="LOGIN">Login</option><option value="LOGOUT">Logout</option></select></div>
+      <div class="fl"><label for="shift">Shift</label>
+        <input id="shift" list="shlist" placeholder="17:30" autocomplete="off"><datalist id="shlist"></datalist></div>
+      <button class="go" id="go">Check shift</button>
+      <button class="ghost" id="newplan">New plan</button>
+    </div>
+    <details class="src"><summary>Data source</summary>
+      <input id="ep" placeholder="Apps Script /exec URL — leave blank to use the site's configured endpoint">
+      <textarea id="paste" placeholder="Or paste the API's JSON response here, then press Check shift"></textarea>
+    </details>
+    <div id="plannote"></div>
+  </div></div>
+
+  <main class="wrap" id="out">
+    <div class="msg"><h2>Pick a shift</h2>
+      Enter a business unit, date, direction and shift, then check.
+      The plan's requirements are already loaded — the shift box suggests only what the plan needs.</div>
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body></html>

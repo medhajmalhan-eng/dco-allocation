@@ -9,7 +9,7 @@ const KM_PER_DEG = [111.0, 105.9]; // HYD
 const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const STORE = "dco-plan-v1";
 
-let ZONES = {}, REGIONS = {}, REQ = null, SHIFTS = {}, META = {};
+let ZONES = {}, REGIONS = {}, REQ = null, SHIFTS = {}, NAMES = {}, META = {};
 const $ = (i) => document.getElementById(i);
 
 /* ---------- helpers ported from recommender.py ---------- */
@@ -89,10 +89,11 @@ function buildRequirements(plan) {
         const label = L.zone || (L.mtype === "flexible"
           ? "Anywhere (no location constraint)" : "Directional area");
         for (const bu of (b.bus || [])) {
-          if (!bu.client) continue;
+          const buId = bu.bu_id || bu.client;      // plans now carry the real bunit_id
+          if (!buId) continue;
           for (const sh of (b.anchor_shifts || [])) {
-            const key = `${wd}|${normClient(bu.client)}|${dirn}|${sh}`;
-            const e = req[key] || (req[key] = { client: bu.client, locs: {} });
+            const key = `${wd}|${buId}|${dirn}|${sh}`;
+            const e = req[key] || (req[key] = { client: bu.client, bu_id: buId, locs: {} });
             const z = e.locs[label] || (e.locs[label] = {
               n: 0, hard: 0, cabs: [], mt: L.mtype,
               c: L.coord, r: L.scope > 1e6 ? null : Math.round(L.scope * 100) / 100,
@@ -105,14 +106,21 @@ function buildRequirements(plan) {
       }
     }
   }
+  // weekday -> bu_id -> direction -> shifts, so the pickers only ever offer
+  // combinations the plan actually has for the chosen day
   const shifts = {};
+  const names = {};
   for (const k of Object.keys(req)) {
-    const [, bu, dirn, sh] = k.split("|");
-    ((shifts[bu] = shifts[bu] || {})[dirn] = shifts[bu][dirn] || new Set()).add(sh);
+    const [wd, bu, dirn, sh] = k.split("|");
+    const w = shifts[wd] = shifts[wd] || {};
+    const b = w[bu] = w[bu] || {};
+    (b[dirn] = b[dirn] || new Set()).add(sh);
+    names[bu] = req[k].client || bu;
   }
-  for (const b in shifts) for (const d in shifts[b]) shifts[b][d] = [...shifts[b][d]].sort();
+  for (const wd in shifts) for (const b in shifts[wd]) for (const d in shifts[wd][b])
+    shifts[wd][b][d] = [...shifts[wd][b][d]].sort();
   return {
-    req, shifts,
+    req, shifts, names,
     meta: {
       city: plan.city || "", start: plan.plan_start || "", end: plan.plan_end || "",
       cabs: cabCount, combos: Object.keys(req).length,
@@ -294,7 +302,7 @@ function activate(built, note) {
   $("hmeta").textContent =
     `PLAN ${META.start} – ${META.end} · ${META.cabs} CABS · ${META.combos} SHIFT COMBINATIONS · ${META.locs} LOCATION REQUIREMENTS`;
   $("hcity").textContent = META.city ? "· " + META.city : "";
-  $("bulist").innerHTML = Object.keys(SHIFTS).sort().map((b) => `<option value="${b}">`).join("");
+  NAMES = built.names || {};
   if (note) { $("plannote").textContent = note; }
   const d = $("date");
   if (!d.value && META.start) d.value = META.start;
@@ -338,24 +346,75 @@ function loadPlanFile(file) {
     $("app").hidden = true; $("upload").hidden = false; $("upstatus").textContent = "";
   });
 
-  const refresh = () => {
-    const b = normClient($("bu").value), d = $("dir").value;
-    const list = ((SHIFTS[b] || {})[d] || []);
-    $("shlist").innerHTML = list.map((s) => `<option value="${s}">`).join("");
+  const weekdayOf = (d) => d ? WD[new Date(d + "T12:00:00").getDay()] : null;
+
+  const fillBUs = () => {
+    const wd = weekdayOf($("date").value);
+    const sel = $("bu"), keep = sel.value;
+    const day = (wd && SHIFTS[wd]) || {};
+    const list = Object.keys(day).sort();
+    if (!list.length) {
+      sel.innerHTML = `<option value="">${wd ? "plan has nothing on " + wd : "pick a date first"}</option>`;
+      sel.disabled = true;
+    } else {
+      sel.innerHTML = `<option value="">Choose…</option>` + list.map((b) =>
+        `<option value="${b}"${b === keep ? " selected" : ""}>${b}${NAMES[b] && NAMES[b] !== b ? "  —  " + NAMES[b] : ""}</option>`).join("");
+      sel.disabled = false;
+    }
+    fillDirs();
   };
-  ["bu", "dir"].forEach((i) => $(i).addEventListener("input", refresh));
+
+  const fillDirs = () => {
+    const wd = weekdayOf($("date").value), bu = $("bu").value;
+    const dirs = Object.keys(((SHIFTS[wd] || {})[bu]) || {}).sort();
+    const sel = $("dir"), keep = sel.value;
+    if (!dirs.length) {
+      sel.innerHTML = `<option value="">—</option>`; sel.disabled = true;
+    } else {
+      sel.innerHTML = dirs.map((d) =>
+        `<option value="${d}"${d === keep ? " selected" : ""}>${d === "LOGIN" ? "Login" : "Logout"}</option>`).join("");
+      sel.disabled = false;
+    }
+    fillShifts();
+  };
+
+  const fillShifts = () => {
+    const wd = weekdayOf($("date").value), bu = $("bu").value, d = $("dir").value;
+    const list = (((SHIFTS[wd] || {})[bu]) || {})[d] || [];
+    const sel = $("shift"), keep = sel.value;
+    if (!list.length) {
+      sel.innerHTML = `<option value="">${bu ? "no planned " + (d || "").toLowerCase() : "pick a business unit"}</option>`;
+      sel.disabled = true;
+    } else {
+      sel.innerHTML = `<option value="">Choose…</option>` + list.map((x) =>
+        `<option value="${x}"${x === keep ? " selected" : ""}>${x}</option>`).join("");
+      sel.disabled = false;
+    }
+    document.querySelectorAll(".fl").forEach((f) => f.classList.remove("bad"));
+  };
+
+  $("date").addEventListener("change", fillBUs);
+  $("bu").addEventListener("change", fillDirs);
+  $("dir").addEventListener("change", fillShifts);
+  fillBUs();
 
   $("go").addEventListener("click", async () => {
     const bu = $("bu").value.trim(), date = $("date").value,
           dir = $("dir").value, shift = $("shift").value.trim();
-    if (!bu || !date || !shift) {
-      $("out").innerHTML = `<div class="msg err"><h2>Missing details</h2>Business unit, date and shift are all needed.</div>`;
+    document.querySelectorAll(".fl").forEach((f) => f.classList.remove("bad"));
+    const missing = [];
+    if (!bu) { missing.push("business unit"); document.querySelector(".fl.bu").classList.add("bad"); }
+    if (!date) { missing.push("date"); document.querySelector(".fl.dt").classList.add("bad"); }
+    if (!shift) { missing.push("shift"); document.querySelector(".fl.sh").classList.add("bad"); }
+    if (missing.length) {
+      $("out").innerHTML = `<div class="msg err"><h2>Pick a ${missing[0]}</h2>
+        Still needed: ${missing.join(", ")}.</div>`;
       return;
     }
     const wd = WD[new Date(date + "T12:00:00").getDay()];
-    const entry = REQ[`${wd}|${normClient(bu)}|${dir}|${shift}`];
+    const entry = REQ[`${wd}|${bu}|${dir}|${shift}`];
     if (!entry) {
-      const avail = ((SHIFTS[normClient(bu)] || {})[dir] || []);
+      const avail = (((SHIFTS[wd] || {})[bu]) || {})[dir] || [];
       $("out").innerHTML = `<div class="msg err"><h2>The plan asks for nothing here</h2>
         No firm commitment for ${esc(bu)} · ${dir} · ${esc(shift)} on ${wd}.
         ${avail.length ? "Shifts the plan does need: <b>" + avail.map(esc).join(", ") + "</b>"
